@@ -1,0 +1,15 @@
+.claude
+# Python
+__pycache__/
+*.pyc
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Output
+output/
+
+# Excel-Backups
+~$*.xlsx
