@@ -34,47 +34,74 @@ Dateiname / Filename: `YYYYMMDD_HHMMSS_Zeitstrahl_<Intervall>.png`
 
 ## Excel-Struktur / Excel Structure
 
-### Events — Spalten / Columns A–F (ab Zeile / from row 2)
+Die Datei benötigt zwei Tabellenblätter / The file requires two sheets:
+
+- **`Zeitstrahl_1`** — Ereignisse und Zeitspannen / Events and time ranges
+- **`Einstellungen`** — Kategorien und Einstellungen / Categories and settings
+
+---
+
+### Blatt `Zeitstrahl_1` — Spalten / Columns A–I (ab Zeile / from row 2)
 
 | Spalte / Column | Inhalt / Content |
 |--------|--------|
-| A | Datum / Date |
-| B | Uhrzeit / Time |
-| C | Quelle / Source |
-| D | Kategorie / Category (must be defined in column J) |
-| E | Text |
-| F | Wichtig / Important (`Ja` / `Nein`) |
+| A | Startdatum / Start date |
+| B | Startuhrzeit / Start time |
+| C | Enddatum / End date (optional — fills a colored range if set) |
+| D | Enduhrzeit / End time |
+| E | Quelle / Source |
+| F | Kategorie / Category (must be defined in `Einstellungen` column C) |
+| G | Text |
+| H | Zusatztext / Additional text |
+| I | Wichtig / Important (`Ja` / `Nein`) |
 
-### Kategorien / Categories — Spalten / Columns J–M (ab Zeile / from row 2)
+Das Label eines Events setzt sich zusammen aus / Event label is built from: `Quelle_Kategorie_Text_Zusatztext`
+
+Wenn Spalten C+D gesetzt sind, wird eine **farbige Zeitspanne** (Fläche) im Hintergrund gezeichnet statt eines einzelnen Ereignis-Markers / If columns C+D are set, a **colored time range** (filled area) is drawn in the background instead of a single event marker.
+
+---
+
+### Blatt `Einstellungen` — Kategorien / Categories (Spalten / Columns C–F, ab Zeile / from row 2)
 
 | Spalte / Column | Inhalt / Content |
 |--------|--------|
-| J | Kategoriename / Category name |
-| K | Farbe / Color (german: `rot`, `blau`, … or hex code) |
-| L | Sichtbar / Visible (`Ja` / `Nein`) |
-| M | Stem-Länge / Stem length (number, default: `2.5`) |
+| C | Kategoriename / Category name |
+| D | Farbe / Color (german: `rot`, `blau`, … or hex code) |
+| E | Sichtbar / Visible (`Ja` / `Nein`) |
+| F | Stem-Länge / Stem length (number, default: `2.5`) |
 
-### Einstellungen / Settings
+---
+
+### Blatt `Einstellungen` — Einstellungen / Settings
 
 | Zelle / Cell | Inhalt / Content |
 |-------|--------|
-| I2 | Tick-Intervall / Tick interval (`1h`, `30min`, `1d`, …) |
-| I19 | Projektname / Project name |
-| J19 | Ausrichtung / Orientation (`horizontal`, `vertikal`, `beides` / `both`) |
-| K19 | Dateiformat / File format (`png`, `pdf`, `beides` / `both`) |
-| N2 / O2 | Startdatum / Startzeit — Start date / time (empty = all data) |
-| P2 / Q2 | Enddatum / Endzeit — End date / time (empty = all data) |
-| R2 | Uhrzeit im Label anzeigen / Show time in label (`Ja` / `Nein`) |
-| S2 | Schriftgröße / Font size (`klein` / `small`, `normal`, `groß` / `large`) |
+| B2 | Tick-Intervall / Tick interval (`1h`, `30min`, `1d`, …) |
+| G2 / H2 | Startdatum / Startzeit — Start date / time (empty = all data) |
+| I2 / J2 | Enddatum / Endzeit — End date / time (empty = all data) |
+| K2 | Uhrzeit im Label anzeigen / Show time in label (`Ja` / `Nein`) |
+| L2 | Schriftgröße / Font size (`klein` / `small`, `normal`, `groß` / `large`) |
+| M2 | Projektname / Project name |
+| N2 | Ausrichtung / Orientation (`horizontal`, `vertikal`, `beides` / `both`) |
+| O2 | Dateiformat / File format (`png`, `pdf`, `beides` / `both`) |
+| P2 | Label-Seite / Stem side (`oben`, `unten`, `beides`) |
 
 ---
 
 ## Hervorhebung wichtiger Events / Highlighting Important Events
 
-Events mit `Ja` in Spalte F / Events with `Ja` in column F:
+Events mit `Ja` in Spalte I / Events with `Ja` in column I:
 - Stern-Symbol am Ende des Stems / Star symbol at the stem tip
 - Fetterer, größerer Label-Text / Bold, larger label text
 - Rahmen um den Label-Text / Box around the label text
+
+---
+
+## Zeitspannen / Time Ranges
+
+Zeilen mit einem gesetzten Enddatum (Spalte C) werden als **farbige Fläche** im Hintergrund des Zeitstrahls dargestellt. Die Farbe richtet sich nach der Kategorie. Zeilen ohne Enddatum werden als normale Ereignis-Marker gezeichnet.
+
+Rows with an end date (column C) are rendered as a **colored background area** on the timeline. The color is taken from the category. Rows without an end date are drawn as regular event markers.
 
 ---
 
