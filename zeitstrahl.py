@@ -68,41 +68,58 @@ def parse_cell_datetime(date_val, time_val):
 
 def load_excel(path):
     wb = openpyxl.load_workbook(path)
-    ws = wb.active
+    ws = wb['Zeitstrahl_1']
+    ws_cfg = wb['Einstellungen']
 
-    # I2: Tick-Intervall | I19: Projektname | J19: Ausrichtung | K19: Dateiformat
-    # N2/O2: Startdatum/-zeit | P2/Q2: Enddatum/-zeit
-    # R2: Uhrzeit im Label | S2: Schriftgröße (klein/normal/groß)
-    interval = parse_interval(ws["I2"].value)
+    # Einstellungen-Blatt: B2=Intervall, G2/H2=Startdatum/-zeit, I2/J2=Enddatum/-zeit,
+    # K2=Uhrzeit-Label, L2=Schriftgröße, M2=Projektname, N2=Ausrichtung, O2=Dateityp, P2=Label-Seite
+    interval = parse_interval(ws_cfg["B2"].value)
     date_range = (
-        parse_cell_datetime(ws["N2"].value, ws["O2"].value),
-        parse_cell_datetime(ws["P2"].value, ws["Q2"].value),
+        parse_cell_datetime(ws_cfg["G2"].value, ws_cfg["H2"].value),
+        parse_cell_datetime(ws_cfg["I2"].value, ws_cfg["J2"].value),
     )
-    show_time_in_label = str(ws["R2"].value).strip().lower() == "ja" if ws["R2"].value is not None else False
+    show_time_in_label = str(ws_cfg["K2"].value).strip().lower() == "ja" if ws_cfg["K2"].value is not None else False
     font_offset = {"klein": -2, "groß": 2, "gross": 2}.get(
-        str(ws["S2"].value).strip().lower() if ws["S2"].value is not None else "", 0
+        str(ws_cfg["L2"].value).strip().lower() if ws_cfg["L2"].value is not None else "", 0
     )
-    project_name = str(ws["I19"].value).strip() if ws["I19"].value is not None else ""
-    orientation = str(ws["J19"].value).strip().lower() if ws["J19"].value is not None else "beide"
-    file_format = str(ws["K19"].value).strip().lower() if ws["K19"].value is not None else "beide"
+    project_name = str(ws_cfg["M2"].value).strip() if ws_cfg["M2"].value is not None else ""
+    orientation = str(ws_cfg["N2"].value).strip().lower() if ws_cfg["N2"].value is not None else "beide"
+    file_format = str(ws_cfg["O2"].value).strip().lower() if ws_cfg["O2"].value is not None else "beide"
+    stem_side = str(ws_cfg["P2"].value).strip().lower() if ws_cfg["P2"].value is not None else "beides"
 
-    # Kategorien aus Spalten J (Name), K (Farbe), L (Sichtbar), M (Stem-Länge)
+    # Kategorien aus Einstellungen: C (Name), D (Farbe), E (Sichtbar), F (Stem-Länge)
     color_map = {}
     visible_cats = set()
     stem_map = {}
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        cat_key = row[9]
+    for row in ws_cfg.iter_rows(min_row=2, values_only=True):
+        cat_key = row[2]  # Spalte C
         if cat_key is not None:
             key = str(cat_key).strip()
-            color_map[key] = resolve_color(row[10])
-            if row[11] is None or str(row[11]).strip().lower() != "nein":
+            color_map[key] = resolve_color(row[3])  # D
+            if row[4] is None or str(row[4]).strip().lower() != "nein":  # E
                 visible_cats.add(key)
-            stem_map[key] = float(row[12]) if row[12] is not None else 2.5
+            stem_map[key] = float(row[5]) if row[5] is not None else 2.5  # F
 
-    # Events aus Spalten A–F
+    # Zeitspannen (Flächen): Zeilen wo C+D ein End-Datum/-Zeit enthalten
+    ranges = []
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        datum, uhrzeit, datum_ende, uhrzeit_ende, _quelle, kategorie = row[:6]
+        if datum is None or not isinstance(datum, datetime):
+            continue
+        if datum_ende is None or not isinstance(datum_ende, datetime):
+            continue
+        start_dt = parse_cell_datetime(datum, uhrzeit)
+        end_dt = parse_cell_datetime(datum_ende, uhrzeit_ende)
+        if start_dt is None or end_dt is None or end_dt <= start_dt:
+            continue
+        cat_str = str(kategorie).strip() if kategorie is not None else ""
+        ranges.append({"start": start_dt, "end": end_dt, "color": color_map.get(cat_str, "#888888")})
+
+    # Events aus Zeitstrahl_1: A=Datum, B=Uhrzeit, C=Datum Ende, D=Uhrzeit Ende,
+    # E=Quelle, F=Kategorie, G=Text1, H=Text2, I=Wichtig
     events = []
     for row in ws.iter_rows(min_row=2, values_only=True):
-        datum, uhrzeit, quelle, kategorie, text, wichtig_val = row[:6]
+        datum, uhrzeit, _datum_ende, _uhrzeit_ende, quelle, kategorie, text, zusatztext, wichtig_val = row[:9]
 
         if datum is None or not isinstance(datum, datetime):
             continue
@@ -122,7 +139,7 @@ def load_excel(path):
         if cat_str not in visible_cats:
             continue
 
-        label = "_".join(str(p) for p in [quelle, kategorie, text] if p is not None)
+        label = "_".join(str(p) for p in [quelle, kategorie, text, zusatztext] if p is not None)
         if show_time_in_label:
             label = f"{label} ({dt.strftime('%H:%M')})"
         wichtig = str(wichtig_val).strip().lower() == "ja" if wichtig_val is not None else False
@@ -136,12 +153,21 @@ def load_excel(path):
         })
 
     events.sort(key=lambda e: e["dt"])
-    return events, interval, date_range, font_offset, project_name, orientation, file_format
+    return events, interval, date_range, font_offset, project_name, orientation, file_format, stem_side, ranges
+
+
+def _snap_to_interval(dt, interval):
+    sec = int(interval.total_seconds())
+    if sec >= 86400:
+        return datetime.combine(dt.date(), dtime(0, 0))
+    elapsed = dt.hour * 3600 + dt.minute * 60 + dt.second
+    snapped = (elapsed // sec) * sec
+    return datetime.combine(dt.date(), dtime(snapped // 3600, (snapped % 3600) // 60))
 
 
 def _tick_positions(t_min, t_max, tick_interval):
     positions = []
-    td = t_min
+    td = _snap_to_interval(t_min, tick_interval)
     while td <= t_max + tick_interval:
         positions.append(td)
         td += tick_interval
@@ -166,7 +192,7 @@ def _wichtig_style(wichtig, font_offset=0):
     }
 
 
-def build_figure(events, interval, date_range=(None, None), font_offset=0, project_name=""):
+def build_figure(events, interval, date_range=(None, None), font_offset=0, project_name="", stem_side="beides", ranges=None):
     if not events:
         print("Keine Ereignisse gefunden.")
         sys.exit(1)
@@ -220,11 +246,20 @@ def build_figure(events, interval, date_range=(None, None), font_offset=0, proje
             ax.text(x, 0.35, td.strftime("%H:%M"), ha="center", va="bottom",
                     fontsize=7, color="#000000", rotation=90)
 
+    for r in (ranges or []):
+        x1, x2 = mdates.date2num(r["start"]), mdates.date2num(r["end"])
+        ax.fill_between([x1, x2], [-6, -6], [6, 6], color=r["color"], alpha=0.2, zorder=0.5)
+
     for i, ev in enumerate(events):
         x = mdates.date2num(ev["dt"])
         color = ev["color"]
         stem_length = ev.get("stem", 2.5)
-        sign = 1 if i % 2 == 0 else -1  # abwechselnd oben/unten
+        if stem_side == "oben":
+            sign = 1
+        elif stem_side == "unten":
+            sign = -1
+        else:
+            sign = 1 if i % 2 == 0 else -1
         wichtig = ev.get("wichtig", False)
         style = _wichtig_style(wichtig, font_offset)
 
@@ -253,7 +288,7 @@ def build_figure(events, interval, date_range=(None, None), font_offset=0, proje
     return fig
 
 
-def build_figure_vertical(events, interval, date_range=(None, None), font_offset=0, project_name=""):
+def build_figure_vertical(events, interval, date_range=(None, None), font_offset=0, project_name="", stem_side="beides", ranges=None):
     if not events:
         print("Keine Ereignisse gefunden.")
         sys.exit(1)
@@ -308,11 +343,20 @@ def build_figure_vertical(events, interval, date_range=(None, None), font_offset
             ax.text(0.35, y, td.strftime("%H:%M"), ha="left", va="center",
                     fontsize=7, color="#000000", rotation=0)
 
+    for r in (ranges or []):
+        y1, y2 = mdates.date2num(r["start"]), mdates.date2num(r["end"])
+        ax.fill_betweenx([y1, y2], [-6, -6], [6, 6], color=r["color"], alpha=0.2, zorder=0.5)
+
     for i, ev in enumerate(events):
         y = mdates.date2num(ev["dt"])
         color = ev["color"]
         stem_length = ev.get("stem", 2.5)
-        sign = 1 if i % 2 == 0 else -1  # abwechselnd links/rechts
+        if stem_side == "oben":
+            sign = 1
+        elif stem_side == "unten":
+            sign = -1
+        else:
+            sign = 1 if i % 2 == 0 else -1
         wichtig = ev.get("wichtig", False)
         style = _wichtig_style(wichtig, font_offset)
 
@@ -353,8 +397,8 @@ def _interval_str(td):
 def main():
     import os
     path = "Zeitstrahl.xlsx"
-    events, interval, date_range, font_offset, project_name, orientation, file_format = load_excel(path)
-    print(f"{len(events)} Ereignisse geladen, Intervall: {interval}")
+    events, interval, date_range, font_offset, project_name, orientation, file_format, stem_side, ranges = load_excel(path)
+    print(f"{len(events)} Ereignisse geladen, {len(ranges)} Zeitspannen, Intervall: {interval}")
 
     os.makedirs("output", exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -363,9 +407,9 @@ def main():
     figures = []
     beide = {"beide", "beides"}
     if orientation in {"horizontal"} | beide:
-        figures.append((build_figure(events, interval, date_range, font_offset, project_name), f"Zeitstrahl_{suffix}"))
+        figures.append((build_figure(events, interval, date_range, font_offset, project_name, stem_side, ranges), f"Zeitstrahl_{suffix}"))
     if orientation in {"vertikal"} | beide:
-        figures.append((build_figure_vertical(events, interval, date_range, font_offset, project_name), f"Zeitstrahl_vertikal_{suffix}"))
+        figures.append((build_figure_vertical(events, interval, date_range, font_offset, project_name, stem_side, ranges), f"Zeitstrahl_vertikal_{suffix}"))
 
     for fig, name in figures:
         base = os.path.join("output", f"{ts}_{name}")

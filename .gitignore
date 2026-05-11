@@ -13,3 +13,5 @@ output/
 
 # Excel-Backups
 ~$*.xlsx
+
+.vscode/
