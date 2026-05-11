@@ -8,6 +8,16 @@ Output is PNG and/or PDF — horizontal or vertical.
 
 ---
 
+## Screenshots
+
+**Horizontal:**  
+![Zeitstrahl horizontal](pictures/Zeitstrahl_horizontal.png)
+
+**Vertikal / Vertical:**  
+![Zeitstrahl vertikal](pictures/Zeitstrahl_vertikal.png)
+
+---
+
 ## Voraussetzungen / Prerequisites
 
 ```
